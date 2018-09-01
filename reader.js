@@ -343,6 +343,9 @@ class Reader {
 
         console.log("Record buffer: ",this.file_buffer.slice(this.file_pointer,this.fileSize));
 
+        console.log("Record count: ",this.recordCount);
+        console.log("Record size: ",this.recordSize);
+        console.log("Storage type: ",this.recordFormat[0]['storage']['storageType']);
 
         // Get record values
         for(let i = 0; i < this.recordCount;i++)
@@ -527,14 +530,25 @@ class Reader {
     {
        let lenght = size;
        let part;
-       this.file_pointer+=lenght; 
-
-       part = this.file_buffer.slice(start,start+size);
-
-       if(storageType==5)
+       
+       if(storageType==1) // uint32
        {
+         lenght = 4;
+         this.file_pointer+=lenght; 
+         part = this.file_buffer.slice(start,start+size);   
+         return part.readUIntLE(0,size); 
+       }
+
+       if(storageType==5) // int8-64
+       {
+         lenght = size;
+         this.file_pointer+=lenght; 
+         part = this.file_buffer.slice(start,start+size);   
          return part.readUIntLE(0,size);  
        }
+
+       
+
 
     }
 
