@@ -136,10 +136,90 @@ class Reader {
 
         console.log('Filepointer: ',this.file_pointer);
 
+        this.hasEmbeddedStrings = (this.flags & 1) > 0;
+        this.hasIdBlock = (this.flags & 1) > 0;
+
+        let eof = 0;
+        let hasRelationshipData = false;
+        let recordCountSum = 0;
+
+        this.sectionheaders = []; 
+
+        for(let i=0;i < this.sectionCount;i++)
+        {
+            let section = {};
+            console.log('Section header: ',i);
+            section['unk1'] = this.get_int_value(this.file_pointer,'uint32');
+            section['unk2'] = this.get_int_value(this.file_pointer,'uint32');
+            section['offset'] = this.get_int_value(this.file_pointer,'uint32');
+            section['recordCount'] = this.get_int_value(this.file_pointer,'uint32');
+            section['stringBlockSize'] = this.get_int_value(this.file_pointer,'uint32');
+            section['copyBlockSize'] = this.get_int_value(this.file_pointer,'uint32');
+            section['indexBlockPos'] = this.get_int_value(this.file_pointer,'uint32');
+            section['idBlockSize'] = this.get_int_value(this.file_pointer,'uint32');
+            section['relationshipDataSize'] = this.get_int_value(this.file_pointer,'uint32'); 
+
+            if (!this.hasEmbeddedStrings) {
+                section['stringBlockPos'] = section['offset'] + (this.recordCount * this.recordSize);
+            } else {
+                section['stringBlockSize'] = 0;
+                section['stringBlockPos'] = section['indexBlockPos'] + 6 * (this.maxId - this.minId + 1); // indexBlockPos is absolute position in file
+            }
+
+            section['idBlockPos'] = section['stringBlockPos'] + section['stringBlockSize'];
+            section['copyBlockPos'] = section['idBlockPos'] + section['idBlockSize'];
+            section['relationshipDataPos'] = section['copyBlockPos'] + section['copyBlockSize'];
+            hasRelationshipData |= section['relationshipDataSize'] > 0;
+
+            eof += section['size'] = section['relationshipDataPos'] + section['relationshipDataSize'] - section['offset'];
+            recordCountSum += section['recordCount'];
+
+            this.sectionheaders[i] = this.ksort(section);
+        }
+
+    
+        console.log(this.sectionheaders[0]);
+        console.log('Filepointer: ',this.file_pointer);
+
+        this.headerSize = this.file_pointer + this.fieldCount*4;
+
+        //Errors
+        if(this.recordCount != recordCountSum)
+        {
+            throw "Non match record count!";  
+        }
+
+        if (this.recordCount == 0) {
+            return;
+        }
+
+        if (this.fieldStorageInfoSize != this.totalFieldCount * 24) {
+            throw "Unexpected file!"; 
+        }
+
+        if (this.hasEmbeddedStrings) {
+            if (this.hasIdBlock) {
+                throw "File has no ID or String value"
+            }
+        
+
+        if (this.sectionCount != 1) {
+            throw 'File has embedded strings and %d sections, expected 1, aborting';
+        }
+
+         this.indexBlockPos = this.sectionheaders[0]['indexBlockPos'];
+        }
 
 
+        this.fieldStorageInfoPos = this.headerSize;
+        this.palletDataPos = this.fieldStorageInfoPos + this.fieldStorageInfoSize;
 
+        this.commonBlockPos = this.palletDataPos + this.palletDataSize;
 
+        eof += this.commonBlockPos + this.commonBlockSize;
+        if (eof != this.fileSize) {
+            throw "Unexpected size: $eof, actual size";
+        }
 
     }
 
@@ -190,6 +270,20 @@ class Reader {
                callback(data);
           });   
     }
+
+
+    // Helper things
+
+    ksort(obj){
+        var keys = Object.keys(obj).sort()
+          , sortedObj = {};
+      
+        for(var i in keys) {
+          sortedObj[keys[i]] = obj[keys[i]];
+        }
+      
+        return sortedObj;
+      }
 
 
 }
