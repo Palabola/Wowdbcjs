@@ -1,23 +1,24 @@
 const fs = require('fs');
 
+const FIELD_TYPE_UNKNOWN = 0;
+const FIELD_TYPE_INT = 1;
+const FIELD_TYPE_FLOAT = 2;
+const FIELD_TYPE_STRING = 3;
+
+const DISTINCT_STRINGS_REQUIRED = 5;
+
+const FIELD_COMPRESSION_NONE = 0;
+const FIELD_COMPRESSION_BITPACKED = 1;
+const FIELD_COMPRESSION_COMMON = 2;
+const FIELD_COMPRESSION_BITPACKED_INDEXED = 3;
+const FIELD_COMPRESSION_BITPACKED_INDEXED_ARRAY = 4;
+const FIELD_COMPRESSION_BITPACKED_SIGNED = 5;  
+
 class Reader {
 
     constructor(filepath)
     {
-        const FIELD_TYPE_UNKNOWN = 0;
-        const FIELD_TYPE_INT = 1;
-        const FIELD_TYPE_FLOAT = 2;
-        const FIELD_TYPE_STRING = 3;
-
-        const DISTINCT_STRINGS_REQUIRED = 5;
-
-        const FIELD_COMPRESSION_NONE = 0;
-        const FIELD_COMPRESSION_BITPACKED = 1;
-        const FIELD_COMPRESSION_COMMON = 2;
-        const FIELD_COMPRESSION_BITPACKED_INDEXED = 3;
-        const FIELD_COMPRESSION_BITPACKED_INDEXED_ARRAY = 4;
-        const FIELD_COMPRESSION_BITPACKED_SIGNED = 5;  
-
+    
         this.fileHandle;
         this.fileFormat = '';
         this.fileName = '';
@@ -220,6 +221,58 @@ class Reader {
         if (eof != this.fileSize) {
             throw "Unexpected size: $eof, actual size";
         }
+
+
+        this.recordFormat = [];
+
+        for (let fieldId = 0; fieldId < this.fieldCount; fieldId++) 
+        {
+            this.recordFormat[fieldId] = {};
+
+            this.recordFormat[fieldId]['bitShift'] = this.get_int_value(this.file_pointer,'uint16');  //unpack('sbitShift/voffset', fread($this->fileHandle, 4));
+            this.recordFormat[fieldId]['offset'] = this.get_int_value(this.file_pointer,'uint16');
+
+
+            this.recordFormat[fieldId]['valueLength'] = Math.max(1, Math.ceil((32 - this.recordFormat[fieldId]['bitShift']) / 8));
+            this.recordFormat[fieldId]['size'] = this.recordFormat[fieldId]['valueLength'];
+            this.recordFormat[fieldId]['type'] = (this.recordFormat[fieldId]['size'] != 4) ? FIELD_TYPE_INT : FIELD_TYPE_UNKNOWN;
+            if (this.hasEmbeddedStrings && this.recordFormat[fieldId]['type'] == FIELD_TYPE_UNKNOWN && !stringFields && fieldI.includes(stringFields)) 
+            {
+                this.recordFormat[fieldId]['type'] = FIELD_TYPE_STRING;
+            }
+            this.recordFormat[fieldId]['signed'] = false;
+            if (fieldId > 0) {
+                this.recordFormat[$fieldId - 1]['valueCount'] =
+                Math.floor((this.recordFormat[fieldId]['offset'] - this.recordFormat[fieldId - 1]['offset']) / this.recordFormat[fieldId - 1]['valueLength']);
+            }
+        }
+
+        console.log('Filepointer: ',this.file_pointer);
+
+        console.log(this.recordFormat);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     }
 
