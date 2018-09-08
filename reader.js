@@ -1,4 +1,5 @@
 const fs = require('fs');
+const bitwise = require('bitwise');
 
 const FIELD_TYPE_UNKNOWN = 0;
 const FIELD_TYPE_INT = 1;
@@ -137,8 +138,13 @@ class Reader {
 
         console.log('Filepointer: ',this.file_pointer);
 
+        console.log('Fieldcount: ', this.maxId);
+
         this.hasEmbeddedStrings = (this.flags & 1) > 0;
         this.hasIdBlock = (this.flags & 1) > 0;
+
+        console.log('HAS EMBEDED STRING: ', this.hasEmbeddedStrings);
+
 
         let eof = 0;
         let hasRelationshipData = false;
@@ -247,9 +253,9 @@ class Reader {
             }
         }
 
-        console.log('Filepointer: ',this.file_pointer);
+        console.log('Filepointer at recordformat : ',this.file_pointer);
 
-        console.log(this.recordFormat);
+        console.log('Record format: ', this.recordFormat);
 
 
         let fieldId = this.fieldCount - 1;
@@ -267,7 +273,7 @@ class Reader {
 
         // Re-check file pointer!
         if(this.file_pointer != this.fieldStorageInfoPos){
-                this.file_pointer  = this.fieldStorageInfoPos;                  
+            throw "File pointer missmatch!";                 
         }
 
 
@@ -334,37 +340,61 @@ class Reader {
         }
         //End loop
 
-        console.log('Record format:',this.recordFormat[0]['storage']);
 
         console.log(this.fileSize);
         console.log(this.file_pointer);
 
 
-
         console.log("Record buffer: ",this.file_buffer.slice(this.file_pointer,this.fileSize));
 
-        console.log("Record count: ",this.recordCount);
-        console.log("Record size: ",this.recordSize);
-        console.log("Storage type: ",this.recordFormat[0]['storage']['storageType']);
+       // console.log('Record format: ', this.recordFormat);
+
+       // console.log("Record count: ",this.recordCount);
+        //console.log("Section Count: ", this.sectionCount);
+        //console.log("Record size: ",this.recordSize);
+  
+        // Debug
+        let buf = this.file_buffer.slice(this.file_pointer,this.fileSize);
 
         // Get record values
-        for(let i = 0; i < this.recordCount;i++)
-        {
+            for(let i = 0; i < this.recordCount;i++)
+            {
 
-           let value =  this.get_record_value(this.file_pointer,this.recordSize,this.recordFormat[0]['storage']['storageType']);
+                for(let k = 0; k < this.recordFormat.length; k++)
+                {
+                    console.log(this.recordFormat[k]['valueLength'],this.recordFormat[k]['type'],this.recordFormat[k]['storage']['offsetBits']);
 
-           console.log('ID: '+(i+1)+" value: "+value);
+                    //let value =  this.get_record_value(this.file_pointer,this.recordFormat[k]['valueLength'],this.recordFormat[k]['type']);
+
+                   // console.log('ID: '+(i+1)+" value: "+value);
+                   
+                   let bit_start = this.recordFormat[k]['storage']['offsetBits'];
+                   let bit_lenght = this.recordFormat[k]['storage']['sizeBits'];
+
+            
+                   this.getDataFromStream(buf);
+                    
+                }
 
 
-        }
+                   // let value =  this.get_record_value(this.file_pointer,this.recordSize,this.recordFormat[0]['storage']['storageType']);
+
+                   // console.log('ID: '+(i+1)+" value: "+value);
+
+
+            }
+  
+            /* Debug */
+          /*  const buf = Buffer.allocUnsafe(2);
+
+                buf.writeUIntBE(1101, 0, 2);
+
+                console.log("1101: ", buf);*/
 
 
 
 
-
-
-
-
+/*
         if (!this.hasIdBlock) {
             if (this.idField >= this.fieldCount) {
                 "Expected ID field " + this.idField +  " does not exist. Only found " + this.fieldCount + " fields.";
@@ -372,7 +402,7 @@ class Reader {
             if (this.recordFormat[this.idField]['valueCount'] != 1) {
                 throw "Expected ID field " + this.idField + " reportedly has " + this.recordFormat[this.idField]['valueCount'] + " values per row";
             }
-        }
+        }*/
 
         if (hasRelationshipData) {
             this.recordFormat[this.totalFieldCount++] = {
@@ -431,15 +461,16 @@ class Reader {
 
             for (let z = 0; z < sectionCount; z++) {
                 if (this.sectionCount) {
-                    recordCount = this.sectionHeaders[$z]['recordCount'];
+                    recordCount = this.sectionHeaders[z]['recordCount'];
                 }
                 if (idOffset !== false) {
                     // attempt shortcut so we don't have to parse the whole record
 
                     if (this.sectionCount) {
-                        fseek($this->fileHandle, $this->sectionHeaders[$z]['offset'] + $idOffset);
+                        this.file_pointer = this.sectionHeaders[z]['offset'] + idOffset;
                     } else {
-                        fseek($this->fileHandle, $this->headerSize + $idOffset);
+                        // fseek($this->fileHandle, $this->headerSize + $idOffset);
+                        this.file_pointer = this.headerSize + idOffset;
                     }
 
                     for ($x = 0; $x < $recordCount; $x++) {
@@ -507,23 +538,17 @@ class Reader {
         unset($section);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    }
+    }   
 */
+
+        getDataFromStream(buffer, bitslenght) {
+            
+        buffer[1] = buffer[1] & 0x1F;
+
+        console.log(buffer.readUIntBE(0,2)); 
+
+        }
+
 
 
     get_record_value(start,size,storageType)
@@ -531,19 +556,15 @@ class Reader {
        let lenght = size;
        let part;
        
-       if(storageType==1) // uint32
-       {
-         lenght = 4;
-         this.file_pointer+=lenght; 
-         part = this.file_buffer.slice(start,start+size);   
-         return part.readUIntLE(0,size); 
-       }
 
-       if(storageType==5) // int8-64
+       if(storageType==5 || storageType==1) // int8-64
        {
          lenght = size;
          this.file_pointer+=lenght; 
          part = this.file_buffer.slice(start,start+size);   
+
+         console.log(part);
+
          return part.readUIntLE(0,size);  
        }
 
